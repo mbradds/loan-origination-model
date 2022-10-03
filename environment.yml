@@ -1,0 +1,7 @@
+name: data-science
+channels:
+  - defaults
+dependencies:
+  - pandas
+  - spyder
+prefix: /home/grant/anaconda3/envs/data-science
