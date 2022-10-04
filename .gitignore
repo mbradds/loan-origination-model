@@ -3,3 +3,4 @@ state_IL_application.csv
 *.pyc
 __pycache__
 *.docx#
+.ipynb_checkpoints
