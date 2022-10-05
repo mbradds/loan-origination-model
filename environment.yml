@@ -4,4 +4,10 @@ channels:
 dependencies:
   - pandas
   - spyder
+  - jupyter
+  - matplotlib
+  - statsmodels
+  - openpyxl
+  - scikit-learn
+  - mlxtend
 prefix: /home/grant/anaconda3/envs/data-science

@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import numpy as np
 
 
 dependent_variable = "action_taken"
@@ -60,6 +61,7 @@ continuous_variables = ["loan_amount",
                         "lender_credits",
                         "loan_term",
                         "prepayment_penalty_term",
+                        "loan_to_value_ratio",
                         "intro_rate_period",
                         "property_value",
                         "multifamily_affordable_units",
@@ -88,4 +90,57 @@ def get_data(file_name):
     else:
         print("enter a valid data file name!")
         return None
+    
+    
+def filter_valid_outcomes(df):
+    df = df[df["action_taken"].isin([1, 3])].copy()
+    return df
+
+
+def filter_null_columns(df, threshold=0.5):
+    total_rows = len(df)
+    drop_count = 0
+    for col in df.columns:
+        total_nulls = df[col].isnull().sum()
+        if total_nulls >= (threshold*total_rows):
+            del df[col]
+            drop_count = drop_count + 1
+    print(str(drop_count)+ " variables with high missing variables removed")
+    return df
+
+
+def process_categorical_variables(df, variable_list):
+    # switch categories to integers for the model
+    # set types as category
+    for col in df:
+        if col in variable_list:
+            df[col] = df[col].fillna("not provided")
+            df[col] = pd.Categorical(df[col])
+            df[col] = df[col].cat.codes
+            df[col] = df[col].astype("category")
+    return df
+
+def process_continuous_variables(df, variable_list):
+    # standardize column data between 0 and 1
+    for col in df:
+        if col in variable_list:
+            df[col] = df[col].replace({"Exempt": np.nan})
+            # TODO look into an exempt/non exempt categorical variable
+            df[col] = pd.to_numeric(df[col])
+            df[col] = df[col].fillna(df[col].mean())
+            max_value = df[col].max()
+            min_value = df[col].min()
+            df[col] = (df[col] - min_value) / (max_value - min_value)
+    return df
+
+
+def filter_low_variance(df):
+    drop_count = 0
+    for col in df.columns:
+        unique = set(list(df[col]))
+        if len(unique) == 1:
+            del df[col]
+            drop_count = drop_count + 1
+    print(str(drop_count) +" variables with low variance removed")
+    return df
 
