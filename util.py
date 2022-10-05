@@ -1,6 +1,9 @@
 import os
 import pandas as pd
 import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LogisticRegression
+from mlxtend.feature_selection import SequentialFeatureSelector as SFS
 
 
 dependent_variable = "action_taken"
@@ -143,4 +146,39 @@ def filter_low_variance(df):
             drop_count = drop_count + 1
     print(str(drop_count) +" variables with low variance removed")
     return df
+
+
+## Create Function to Print Results
+def get_results(x1):
+    print("\n{0:20}   {1:4}    {2:4}".format('Model','Train','Test'))
+    print('-------------------------------------------')
+    for i in x1.keys():
+        print("{0:20}   {1:<6.4}   {2:<6.4}".format(i,x1[i][0],x1[i][1]))
+
+
+def get_train_test_data(df, features=False):
+    X = df.drop("action_taken", axis = 1)
+    if features:
+        X = df[features]
+    y = df[["action_taken"]]
+    y = y.values.ravel()
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42, stratify=y)
+    return X_train, X_test, y_train, y_test, X, y
+
+        
+def feature_selection(df, n=500, num_features="best"):
+    df = df.head(n)
+    X_train, X_test, y_train, y_test, X, y = get_train_test_data(df)
+    sfs = SFS(LogisticRegression(max_iter=10000),
+              k_features=num_features,
+              forward=True,
+              floating=False,
+              scoring = 'accuracy',
+              n_jobs=-1,
+              cv = 4)
+    sfs.fit(X, y)
+    print("feature selection score: ", sfs.k_score_)
+    return list(sfs.k_feature_names_)
+
+
 
