@@ -235,11 +235,10 @@ def get_results(x1):
         print("{0:20}   {1:<6.4}   {2:<6.4}".format(i,x1[i][0],x1[i][1]))
 
 
-def get_train_test_data(X, y, features=False):
+def get_train_test_data(X, y, features=False, test_size=0.25):
     if features:
         X = X[features]
-
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42, stratify=y)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42, stratify=y)
     return X_train, X_test, y_train, y_test, X
 
 
