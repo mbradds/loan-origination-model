@@ -4,6 +4,8 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from mlxtend.feature_selection import SequentialFeatureSelector as SFS
+from sklearn.preprocessing import StandardScaler
+from sklearn.compose import ColumnTransformer
 
 
 dependent_variable = "action_taken"
@@ -58,16 +60,10 @@ continuous_variables = ["loan_amount",
                         "interest_rate",
                         "rate_spread",
                         "total_loan_costs",
-                        "total_points_and_fees",
                         "origination_charges",
-                        "discount_points",
-                        "lender_credits",
                         "loan_term",
-                        "prepayment_penalty_term",
                         "loan_to_value_ratio",
-                        "intro_rate_period",
                         "property_value",
-                        "multifamily_affordable_units",
                         "income",
                         "tract_population",
                         "tract_minority_population_percent",
@@ -97,6 +93,8 @@ def get_data(file_name):
     
 def filter_valid_outcomes(df):
     df = df[df["action_taken"].isin([1, 3])].copy()
+    # df["action_taken"] = df["action_taken"].astype("category")
+    print("invalid loan outcomes removed")
     return df
 
 
@@ -121,9 +119,10 @@ def process_categorical_variables(df, variable_list):
             df[col] = pd.Categorical(df[col])
             df[col] = df[col].cat.codes
             df[col] = df[col].astype("category")
+    print("categorical variables processed")
     return df
 
-def process_continuous_variables(df, variable_list):
+def process_continuous_variables(df, variable_list, standardize=True):
     # standardize column data between 0 and 1
     for col in df:
         if col in variable_list:
@@ -131,9 +130,11 @@ def process_continuous_variables(df, variable_list):
             # TODO look into an exempt/non exempt categorical variable
             df[col] = pd.to_numeric(df[col])
             df[col] = df[col].fillna(df[col].mean())
-            max_value = df[col].max()
-            min_value = df[col].min()
-            df[col] = (df[col] - min_value) / (max_value - min_value)
+            if standardize:
+                max_value = df[col].max()
+                min_value = df[col].min()
+                df[col] = (df[col] - min_value) / (max_value - min_value)
+    print("continuous variables standardized")
     return df
 
 
@@ -145,6 +146,16 @@ def filter_low_variance(df):
             del df[col]
             drop_count = drop_count + 1
     print(str(drop_count) +" variables with low variance removed")
+    return df
+
+
+def pre_process_loan_data(df, categorical_variables, continuous_variables, standardize_cont=True):
+    df = filter_valid_outcomes(df)
+    df = filter_null_columns(df)
+    df = filter_low_variance(df)
+    df = process_categorical_variables(df, categorical_variables)
+    df = process_continuous_variables(df, continuous_variables)
+    df = df.dropna()
     return df
 
 
@@ -178,6 +189,7 @@ def feature_selection(df, n=500, num_features="best"):
               cv = 4)
     sfs.fit(X, y)
     print("feature selection score: ", sfs.k_score_)
+    print("SFS chosen features: ", sfs.k_feature_names_)
     return list(sfs.k_feature_names_)
 
 
