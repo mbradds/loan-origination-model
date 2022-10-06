@@ -168,11 +168,12 @@ def get_results(x1):
 
 
 def get_train_test_data(df, features=False):
-    X = df.drop("action_taken", axis = 1)
-    if features:
-        X = df[features]
     y = df[["action_taken"]]
     y = y.values.ravel()
+    X = df.drop("action_taken", axis = 1)
+    if features:
+        X = X[features]
+
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42, stratify=y)
     return X_train, X_test, y_train, y_test, X, y
 
