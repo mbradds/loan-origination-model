@@ -4,18 +4,13 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from mlxtend.feature_selection import SequentialFeatureSelector as SFS
-from sklearn.preprocessing import StandardScaler
-from sklearn.compose import ColumnTransformer
 
 
 dependent_variable = "action_taken"
 
 categorical_variables = ["activity_year",
-                         "lei",
                          "derived_msa-md",
                          "state_code",
-                         "county_code",
-                         "census_tract",
                          "derived_loan_product_type",
                          "derived_dwelling_category",
                          "conforming_loan_limit",
@@ -57,7 +52,10 @@ categorical_variables = ["activity_year",
                          "denial_reason-4"]
 
 continuous_variables = ["loan_amount",
+                        "lei",
+                        "county_code",
                         "interest_rate",
+                        "census_tract",
                         "rate_spread",
                         "total_loan_costs",
                         "origination_charges",
@@ -126,6 +124,12 @@ def process_continuous_variables(df, variable_list, standardize=True):
     # standardize column data between 0 and 1
     for col in df:
         if col in variable_list:
+            if col == "lei":
+                df[col] = df[col].fillna("not provided")
+                df[col] = pd.Categorical(df[col])
+                df[col] = df[col].cat.codes
+                df[col] = df[col].astype("category")
+                
             df[col] = df[col].replace({"Exempt": np.nan})
             # TODO look into an exempt/non exempt categorical variable
             df[col] = pd.to_numeric(df[col])
@@ -154,7 +158,7 @@ def pre_process_loan_data(df, categorical_variables, continuous_variables, stand
     df = filter_null_columns(df)
     df = filter_low_variance(df)
     df = process_categorical_variables(df, categorical_variables)
-    df = process_continuous_variables(df, continuous_variables)
+    df = process_continuous_variables(df, continuous_variables, standardize=standardize_cont)
     df = df.dropna()
     return df
 
@@ -167,20 +171,18 @@ def get_results(x1):
         print("{0:20}   {1:<6.4}   {2:<6.4}".format(i,x1[i][0],x1[i][1]))
 
 
-def get_train_test_data(df, features=False):
-    y = df[["action_taken"]]
-    y = y.values.ravel()
-    X = df.drop("action_taken", axis = 1)
+def get_train_test_data(X, y, features=False):
     if features:
         X = X[features]
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42, stratify=y)
-    return X_train, X_test, y_train, y_test, X, y
+    return X_train, X_test, y_train, y_test, X
 
         
-def feature_selection(df, n=500, num_features="best"):
+def feature_selection(df, y, n=500, num_features="best"):
     df = df.head(n)
-    X_train, X_test, y_train, y_test, X, y = get_train_test_data(df)
+    y = y[:n]
+    X_train, X_test, y_train, y_test, X = get_train_test_data(df, y)
     sfs = SFS(LogisticRegression(max_iter=10000),
               k_features=num_features,
               forward=True,
