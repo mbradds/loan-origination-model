@@ -74,8 +74,8 @@ continuous_variables = ["loan_amount",
 def set_cwd_to_script():
     dname = os.path.dirname(os.path.abspath(__file__))
     os.chdir(dname)
-    
-    
+
+
 def get_data(file_name):
     path = os.path.join(os.getcwd(), "data", file_name)
     if ".csv" in file_name:
@@ -87,8 +87,31 @@ def get_data(file_name):
     else:
         print("enter a valid data file name!")
         return None
-    
-    
+
+
+'''
+Correlation matrix
+
+Independent variables that correlate strongly with the dependent variable
+(action taken) should be included in the model.
+
+Alot of the independent variables are correlated with each other. This is
+called multicolinarity and can interfere with the model results.
+https://towardsdatascience.com/multi-collinearity-in-regression-fe7a2c1467ea
+
+'''
+def find_high_corr(df):
+    corr = df.corr()
+    for col in corr:
+        corr_list = corr[col]
+        i = 0
+        for corr_value in corr_list:
+            if abs(corr_value) > 0.9 and col != corr.index[i]:
+                print("High correlation ("+str(abs(corr_value))+") between "+col+" and "+
+                      corr.index[i]+" ,condider removing from model to avoid multicolinearity")
+            i = i+1
+
+
 def filter_valid_outcomes(df):
     df = df[df["action_taken"].isin([1, 3])].copy()
     # df["action_taken"] = df["action_taken"].astype("category")
@@ -129,7 +152,7 @@ def process_continuous_variables(df, variable_list, standardize=True):
                 df[col] = pd.Categorical(df[col])
                 df[col] = df[col].cat.codes
                 df[col] = df[col].astype("category")
-                
+
             df[col] = df[col].replace({"Exempt": np.nan})
             # TODO look into an exempt/non exempt categorical variable
             df[col] = pd.to_numeric(df[col])
@@ -153,14 +176,38 @@ def filter_low_variance(df):
     return df
 
 
-def pre_process_loan_data(df, categorical_variables, continuous_variables, standardize_cont=True):
+def check_variables_for_nulls(df):
+    for col, null_count in zip(df.isnull(), df.isnull().sum()):
+        if null_count > 0:
+            print(col+" has null values!")
+
+
+def pre_process_loan_data(df, cat_variables, cont_variables, standardize_cont=True):
     df = filter_valid_outcomes(df)
     df = filter_null_columns(df)
     df = filter_low_variance(df)
-    df = process_categorical_variables(df, categorical_variables)
-    df = process_continuous_variables(df, continuous_variables, standardize=standardize_cont)
+    df = process_categorical_variables(df, cat_variables)
+    df = process_continuous_variables(df, cont_variables, standardize=standardize_cont)
     df = df.dropna()
+    check_variables_for_nulls(df)
+    find_high_corr(df)
     return df
+
+
+def limit_data(df, n=20000):
+    df = df.head(n)
+    return df
+
+
+def back_to_df(X):
+    return pd.DataFrame(X.toarray())
+
+
+def get_x_and_y(df, dep_variable):
+    y = df[[dep_variable]]
+    y = y.values.ravel()
+    df = df.drop(dep_variable, axis=1)
+    return df, y
 
 
 ## Create Function to Print Results
@@ -178,7 +225,7 @@ def get_train_test_data(X, y, features=False):
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42, stratify=y)
     return X_train, X_test, y_train, y_test, X
 
-        
+
 def feature_selection(df, y, n=500, num_features="best"):
     df = df.head(n)
     y = y[:n]
