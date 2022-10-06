@@ -3,6 +3,11 @@ import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
+from sklearn.compose import make_column_selector as selector
+from sklearn.preprocessing import OneHotEncoder, StandardScaler, FunctionTransformer
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import make_pipeline
+from sklearn import metrics
 from mlxtend.feature_selection import SequentialFeatureSelector as SFS
 
 
@@ -195,7 +200,8 @@ def pre_process_loan_data(df, cat_variables, cont_variables, standardize_cont=Tr
 
 
 def limit_data(df, n=20000):
-    df = df.head(n)
+    if n:
+        df = df.head(n)
     return df
 
 
@@ -241,6 +247,40 @@ def feature_selection(df, y, n=500, num_features="best"):
     print("feature selection score: ", sfs.k_score_)
     print("SFS chosen features: ", sfs.k_feature_names_)
     return list(sfs.k_feature_names_)
+
+
+
+def sklearn_pre_process_loan_data(data, limit=20000):
+    data = limit_data(data, limit)
+    data, y = get_x_and_y(data, dependent_variable)
+
+    numerical_columns_selector = selector(dtype_include=float)
+    categorical_columns_selector = selector(dtype_exclude=float)
+
+    numerical_columns = numerical_columns_selector(data)
+    categorical_columns = categorical_columns_selector(data)
+
+    categorical_preprocessor = OneHotEncoder(handle_unknown="ignore")
+    numerical_preprocessor = StandardScaler()
+
+    ct = ColumnTransformer([
+        ('one hot encoder', categorical_preprocessor, categorical_columns),
+        ('standard_scaler', numerical_preprocessor, numerical_columns)],
+    remainder='passthrough')
+
+    df_convert = FunctionTransformer(back_to_df)
+    preprocessor = make_pipeline(ct, df_convert)
+
+    # model_data_processed = pd.DataFrame(preprocessor.fit_transform(loan_data).toarray())
+    model_data_processed = preprocessor.fit_transform(data)
+    return model_data_processed, y, preprocessor
+
+
+def evaluate_model(results, model, model_name, X_train, X_test, y_train, y_test):
+    results[model_name] = (metrics.accuracy_score(y_train, model.predict(X_train)),
+                           metrics.accuracy_score(y_test, model.predict(X_test)))
+    get_results(results)
+    return results
 
 
 
