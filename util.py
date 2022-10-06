@@ -187,15 +187,19 @@ def check_variables_for_nulls(df):
             print(col+" has null values!")
 
 
-def pre_process_loan_data(df, cat_variables, cont_variables, standardize_cont=True):
-    df = filter_valid_outcomes(df)
-    df = filter_null_columns(df)
-    df = filter_low_variance(df)
+def pre_process_loan_data(df, cat_variables, cont_variables, standardize_cont=True, test_data=True):
+    if test_data:
+        df = filter_valid_outcomes(df)
+        df = filter_null_columns(df)
+        df = filter_low_variance(df)
+        
     df = process_categorical_variables(df, cat_variables)
     df = process_continuous_variables(df, cont_variables, standardize=standardize_cont)
     df = df.dropna()
-    check_variables_for_nulls(df)
-    find_high_corr(df)
+    
+    if test_data:
+        check_variables_for_nulls(df)
+        find_high_corr(df)
     return df
 
 
@@ -206,13 +210,20 @@ def limit_data(df, n=20000):
 
 
 def back_to_df(X):
-    return pd.DataFrame(X.toarray())
+    try:
+        df = pd.DataFrame(X.toarray())
+    except:
+        df = pd.DataFrame(X)
+    return df
 
 
-def get_x_and_y(df, dep_variable):
-    y = df[[dep_variable]]
-    y = y.values.ravel()
-    df = df.drop(dep_variable, axis=1)
+def get_x_and_y(df, dep_variable, test_data):
+    if test_data:
+        y = df[[dep_variable]]
+        y = y.values.ravel()
+        df = df.drop(dep_variable, axis=1)
+    else:
+        y = None
     return df, y
 
 
@@ -250,15 +261,16 @@ def feature_selection(df, y, n=500, num_features="best"):
 
 
 
-def sklearn_pre_process_loan_data(data, limit=20000):
+def sklearn_pre_process_loan_data(data, limit=20000, test_data=True):
     data = limit_data(data, limit)
-    data, y = get_x_and_y(data, dependent_variable)
+    data, y = get_x_and_y(data, dependent_variable, test_data)
 
     numerical_columns_selector = selector(dtype_include=float)
-    categorical_columns_selector = selector(dtype_exclude=float)
+    categorical_columns_selector = selector(dtype_exclude=[float, object])
 
     numerical_columns = numerical_columns_selector(data)
     categorical_columns = categorical_columns_selector(data)
+    
 
     categorical_preprocessor = OneHotEncoder(handle_unknown="ignore")
     numerical_preprocessor = StandardScaler()
@@ -267,13 +279,14 @@ def sklearn_pre_process_loan_data(data, limit=20000):
         ('one hot encoder', categorical_preprocessor, categorical_columns),
         ('standard_scaler', numerical_preprocessor, numerical_columns)],
     remainder='passthrough')
+    
 
     df_convert = FunctionTransformer(back_to_df)
     preprocessor = make_pipeline(ct, df_convert)
 
-    # model_data_processed = pd.DataFrame(preprocessor.fit_transform(loan_data).toarray())
-    model_data_processed = preprocessor.fit_transform(data)
-    return model_data_processed, y, preprocessor
+    df = preprocessor.fit_transform(data)
+    df.columns = ct.get_feature_names_out()
+    return df, y, preprocessor
 
 
 def evaluate_model(results, model, model_name, X_train, X_test, y_train, y_test):
@@ -281,6 +294,22 @@ def evaluate_model(results, model, model_name, X_train, X_test, y_train, y_test)
                            metrics.accuracy_score(y_test, model.predict(X_test)))
     get_results(results)
     return results
+
+
+def column_standardizer(df_test, df_eval):
+    test_cols = df_test.columns
+    eval_cols = df_eval.columns
+    
+    # if there is a column in the train data and not in the eval data, remove it from test
+    for tc in test_cols:
+        if tc not in eval_cols:
+            del df_test[tc]
+            
+    for ec in eval_cols:
+        if ec not in test_cols:
+            del df_eval[ec]
+            
+    return df_test, df_eval
 
 
 
