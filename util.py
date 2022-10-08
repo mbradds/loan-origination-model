@@ -101,18 +101,25 @@ def get_data(file_name):
         return None
 
 
-'''
-Correlation matrix
-
-Independent variables that correlate strongly with the dependent variable
-(action taken) should be included in the model.
-
-Alot of the independent variables are correlated with each other. This is
-called multicolinarity and can interfere with the model results.
-https://towardsdatascience.com/multi-collinearity-in-regression-fe7a2c1467ea
-
-'''
 def find_high_corr(df):
+    '''
+    Independent variables that correlate strongly with the dependent variable
+    (action taken) should be included in the model.
+
+    Alot of the independent variables are correlated with each other. This is
+    called multicolinarity and can interfere with the model results.
+    https://towardsdatascience.com/multi-collinearity-in-regression-fe7a2c1467ea
+
+    Parameters
+    ----------
+    df : DataFrame
+        loan data prior to one hot encoding.
+
+    Returns
+    -------
+    None.
+
+    '''
     corr = df.corr()
     for col in corr:
         corr_list = corr[col]
@@ -243,7 +250,15 @@ def get_x_and_y(df, dep_variable, test_data):
 def get_train_test_data(X, y, features=False, test_size=0.25):
     if features:
         X = X[features]
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42, stratify=y)
+
+    if test_size != 1:
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42, stratify=y)
+    else:
+        X_train = X
+        y_train = y
+        X_test = None
+        y_test = None
+
     return X_train, X_test, y_train, y_test, X
 
 
