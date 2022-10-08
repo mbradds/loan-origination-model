@@ -251,7 +251,7 @@ def get_train_test_data(X, y, features=False, test_size=0.25):
     if features:
         X = X[features]
 
-    if test_size != 1:
+    if test_size != 0:
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42, stratify=y)
     else:
         X_train = X
@@ -259,13 +259,13 @@ def get_train_test_data(X, y, features=False, test_size=0.25):
         X_test = None
         y_test = None
 
-    return X_train, X_test, y_train, y_test, X
+    return X_train, X_test, y_train, y_test
 
 
 def feature_selection(df, y, n=500, num_features="best"):
     df = df.head(n)
     y = y[:n]
-    X_train, X_test, y_train, y_test, X = get_train_test_data(df, y)
+    X_train, X_test, y_train, y_test = get_train_test_data(df, y, False, 0)
     sfs = SFS(LogisticRegression(max_iter=10000),
               k_features=num_features,
               forward=True,
@@ -273,7 +273,7 @@ def feature_selection(df, y, n=500, num_features="best"):
               scoring='accuracy',
               n_jobs=-1,
               cv=4)
-    sfs.fit(X, y)
+    sfs.fit(X_train, y_train)
     print("feature selection score: ", sfs.k_score_)
     print("SFS chosen features: ", sfs.k_feature_names_)
     return list(sfs.k_feature_names_)
@@ -308,6 +308,8 @@ def sklearn_pre_process_loan_data(data, limit=20000, test_data=True):
 def evaluate_model(results, model, model_name, X_train, X_test, y_train, y_test):
     results[model_name] = {"Train Score": metrics.accuracy_score(y_train, model.predict(X_train)),
                            "Test Score": metrics.accuracy_score(y_test, model.predict(X_test)),
+                           "Test Precision": metrics.precision_score(y_test, model.predict(X_test)),
+                           "Test Recall": metrics.recall_score(y_test, model.predict(X_test)),
                            "Test AUC": metrics.roc_auc_score(y_test, model.predict(X_test))}
     return results
 
