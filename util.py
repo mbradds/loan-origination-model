@@ -74,7 +74,14 @@ continuous_variables = ["loan_amount",
                         "tract_to_msa_income_percentage",
                         "tract_owner_occupied_units",
                         "tract_one_to_four_family_homes",
-                        "tract_median_age_of_housing_units"]
+                        "tract_median_age_of_housing_units",
+                        "total_points_and_fees",
+                        "discount_points",
+                        "lender_credits",
+                        "prepayment_penalty_term",
+                        "intro_rate_period",
+                        "multifamily_affordable_units"]
+
 
 def set_cwd_to_script():
     dname = os.path.dirname(os.path.abspath(__file__))
@@ -112,13 +119,16 @@ def find_high_corr(df):
         i = 0
         for corr_value in corr_list:
             if abs(corr_value) > 0.9 and col != corr.index[i]:
-                print("High correlation ("+str(abs(corr_value))+") between "+col+" and "+
+                print("High correlation (" + str(abs(corr_value))+") between " + col + " and " +
                       corr.index[i]+" ,condider removing from model to avoid multicolinearity")
             i = i+1
 
 
 def filter_valid_outcomes(df):
-    df = df[df["action_taken"].isin([1, 3])].copy()
+    df = df[df[dependent_variable].isin([1, 3])].copy()
+    df[dependent_variable] = df[dependent_variable].map({1: 1,
+                                                         3: 0})
+
     # df["action_taken"] = df["action_taken"].astype("category")
     print("invalid loan outcomes removed")
     return df
@@ -132,8 +142,16 @@ def filter_null_columns(df, threshold=0.5):
         if total_nulls >= (threshold*total_rows):
             del df[col]
             drop_count = drop_count + 1
-    print(str(drop_count)+ " variables with high missing variables removed")
+    print(str(drop_count) + " variables with high missing variables removed")
     return df
+
+
+def categorical_steps(df, col):
+    df[col] = df[col].fillna("not provided")
+    df[col] = pd.Categorical(df[col])
+    df[col] = df[col].cat.codes
+    df[col] = df[col].astype("category")
+    return df, col
 
 
 def process_categorical_variables(df, variable_list):
@@ -141,22 +159,17 @@ def process_categorical_variables(df, variable_list):
     # set types as category
     for col in df:
         if col in variable_list:
-            df[col] = df[col].fillna("not provided")
-            df[col] = pd.Categorical(df[col])
-            df[col] = df[col].cat.codes
-            df[col] = df[col].astype("category")
+            df, col = categorical_steps(df, col)
     print("categorical variables processed")
     return df
+
 
 def process_continuous_variables(df, variable_list, standardize=True):
     # standardize column data between 0 and 1
     for col in df:
         if col in variable_list:
             if col == "lei":
-                df[col] = df[col].fillna("not provided")
-                df[col] = pd.Categorical(df[col])
-                df[col] = df[col].cat.codes
-                df[col] = df[col].astype("category")
+                df, col = categorical_steps(df, col)
 
             df[col] = df[col].replace({"Exempt": np.nan})
             # TODO look into an exempt/non exempt categorical variable
@@ -177,7 +190,7 @@ def filter_low_variance(df):
         if len(unique) == 1:
             del df[col]
             drop_count = drop_count + 1
-    print(str(drop_count) +" variables with low variance removed")
+    print(str(drop_count) + " variables with low variance removed")
     return df
 
 
@@ -192,12 +205,12 @@ def pre_process_loan_data(df, cat_variables, cont_variables, standardize_cont=Tr
         df = filter_valid_outcomes(df)
         df = filter_null_columns(df)
         df = filter_low_variance(df)
-        
+
     df = process_categorical_variables(df, cat_variables)
     df = process_continuous_variables(df, cont_variables, standardize=standardize_cont)
-    df = df.dropna()
-    
+
     if test_data:
+        df = df.dropna()
         check_variables_for_nulls(df)
         find_high_corr(df)
     return df
@@ -227,14 +240,6 @@ def get_x_and_y(df, dep_variable, test_data):
     return df, y
 
 
-## Create Function to Print Results
-def get_results(x1):
-    print("\n{0:20}   {1:4}    {2:4}".format('Model','Train','Test'))
-    print('-------------------------------------------')
-    for i in x1.keys():
-        print("{0:20}   {1:<6.4}   {2:<6.4}".format(i,x1[i][0],x1[i][1]))
-
-
 def get_train_test_data(X, y, features=False, test_size=0.25):
     if features:
         X = X[features]
@@ -250,14 +255,13 @@ def feature_selection(df, y, n=500, num_features="best"):
               k_features=num_features,
               forward=True,
               floating=False,
-              scoring = 'accuracy',
+              scoring='accuracy',
               n_jobs=-1,
-              cv = 4)
+              cv=4)
     sfs.fit(X, y)
     print("feature selection score: ", sfs.k_score_)
     print("SFS chosen features: ", sfs.k_feature_names_)
     return list(sfs.k_feature_names_)
-
 
 
 def sklearn_pre_process_loan_data(data, limit=20000, test_data=True):
@@ -269,7 +273,6 @@ def sklearn_pre_process_loan_data(data, limit=20000, test_data=True):
 
     numerical_columns = numerical_columns_selector(data)
     categorical_columns = categorical_columns_selector(data)
-    
 
     categorical_preprocessor = OneHotEncoder(handle_unknown="ignore")
     numerical_preprocessor = StandardScaler()
@@ -277,8 +280,7 @@ def sklearn_pre_process_loan_data(data, limit=20000, test_data=True):
     ct = ColumnTransformer([
         ('one hot encoder', categorical_preprocessor, categorical_columns),
         ('standard_scaler', numerical_preprocessor, numerical_columns)],
-    remainder='passthrough')
-    
+        remainder='passthrough')
 
     df_convert = FunctionTransformer(back_to_df)
     preprocessor = make_pipeline(ct, df_convert)
@@ -289,25 +291,34 @@ def sklearn_pre_process_loan_data(data, limit=20000, test_data=True):
 
 
 def evaluate_model(results, model, model_name, X_train, X_test, y_train, y_test):
-    results[model_name] = (metrics.accuracy_score(y_train, model.predict(X_train)),
-                           metrics.accuracy_score(y_test, model.predict(X_test)))
-    get_results(results)
+    results[model_name] = {"Train Score": metrics.accuracy_score(y_train, model.predict(X_train)),
+                           "Test Score": metrics.accuracy_score(y_test, model.predict(X_test)),
+                           "Test AUC": metrics.roc_auc_score(y_test, model.predict(X_test))}
     return results
 
 
+'''
+This function makes sure that the processed input data (state_IL_application.csv)
+and the processed evaluation data (X_test.xlsx) have the same feautures prior
+to model training.
+
+This is important because the evaluation data is smaller, and some categorical
+features may not have a full set of observations. After one hot encoding,
+this could lead to a different number of features between the datasets.
+'''
 def column_standardizer(df_test, df_eval):
     test_cols = df_test.columns
     eval_cols = df_eval.columns
-    
+
     # if there is a column in the train data and not in the eval data, remove it from test
     for tc in test_cols:
         if tc not in eval_cols:
             del df_test[tc]
-            
+
     for ec in eval_cols:
         if ec not in test_cols:
             del df_eval[ec]
-            
+
     return df_test, df_eval
 
 
