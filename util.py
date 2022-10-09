@@ -132,6 +132,21 @@ def find_high_corr(df):
 
 
 def filter_valid_outcomes(df):
+    '''
+    According to the problem statement, only issued loans (1) and rejected
+    loans (3) should be evaluated.
+
+    Parameters
+    ----------
+    df : DataFrame
+        loan data.
+
+    Returns
+    -------
+    df : DataFrame
+        loan data.
+
+    '''
     df = df[df[dependent_variable].isin([1, 3])].copy()
     df[dependent_variable] = df[dependent_variable].map({1: 1,
                                                          3: 0})
@@ -142,6 +157,25 @@ def filter_valid_outcomes(df):
 
 
 def filter_null_columns(df, threshold=0.5):
+    '''
+    Features/columns that have a high amount of blank data (more than 50% of
+    the column is empty) are unlikely to be useful to the model and should be
+    removed.
+
+    Parameters
+    ----------
+    df : DataFrame
+        loan data.
+    threshold : float, optional
+        DESCRIPTION. The default is 0.5. A value between zero and 1. Eg 0.5
+        will delete columns with >50 null values.
+
+    Returns
+    -------
+    df : DataFrame
+        DESCRIPTION. A DataFrame with high null columns deleted.
+
+    '''
     total_rows = len(df)
     drop_count = 0
     for col in df.columns:
@@ -162,8 +196,25 @@ def categorical_steps(df, col):
 
 
 def process_categorical_variables(df, variable_list):
-    # switch categories to integers for the model
-    # set types as category
+    '''
+    Applies the following transformations to categorical variables:
+        1. switched "not provided" with null
+        2. applies the categorical data type to the column
+        3. replaces categories with numeic codes (object to float conversion)
+
+    Parameters
+    ----------
+    df : DataFrame
+        DESCRIPTION. Loan data
+    variable_list : Array
+        DESCRIPTION. List of categorical independent variables in the loan data.
+
+    Returns
+    -------
+    df : DataFrame
+        DESCRIPTION. Loan data.
+
+    '''
     for col in df:
         if col in variable_list:
             df, col = categorical_steps(df, col)
@@ -172,7 +223,28 @@ def process_categorical_variables(df, variable_list):
 
 
 def process_continuous_variables(df, variable_list, standardize=True):
-    # standardize column data between 0 and 1
+    '''
+    Applies the following transformation to continuous variables:
+        1. replaces exempt with null
+        2. converts column to numeric data type
+        3. fills empty values with the mean of the column
+        4. optionally standardizes values between 0 and 1
+
+    Parameters
+    ----------
+    df : DataFrame
+        DESCRIPTION. Loan data
+    variable_list : array
+        DESCRIPTION. list of continuous independent variables in the loan data.
+    standardize : optional, boolean
+        DESCRIPTION. The default is True. Whether to standardize column values between zero and 1.
+
+    Returns
+    -------
+    df : DataFrame
+        DESCRIPTION. Loan data
+
+    '''
     for col in df:
         if col in variable_list:
             if col == "lei":
@@ -191,6 +263,21 @@ def process_continuous_variables(df, variable_list, standardize=True):
 
 
 def filter_low_variance(df):
+    '''
+    Varaibles with low variance (only one observation) will not benefit any
+    model and should be removed prior to training.
+
+    Parameters
+    ----------
+    df : DataFrame
+        DESCRIPTION. Loan data.
+
+    Returns
+    -------
+    df : DataFrame
+        DESCRIPTION. Loan data.
+
+    '''
     drop_count = 0
     for col in df.columns:
         unique = set(list(df[col]))
@@ -202,12 +289,40 @@ def filter_low_variance(df):
 
 
 def check_variables_for_nulls(df):
+    '''
+    Checks if a dataframe has any null values in any column.
+    '''
     for col, null_count in zip(df.isnull(), df.isnull().sum()):
         if null_count > 0:
             print(col+" has null values!")
 
 
 def pre_process_loan_data(df, cat_variables, cont_variables, standardize_cont=True, test_data=True):
+    '''
+    Combines several data processing functions into one function. Differentiates
+    between the test data set, and the evaluation data.
+
+    Parameters
+    ----------
+    df : DataFrame
+        DESCRIPTION. Loan data (test data or evaluation data).
+    cat_variables : array
+        DESCRIPTION. List of categorical independent variables.
+    cont_variables : array
+        DESCRIPTION. List of continuous variables.
+    standardize_cont : TYPE, optional
+        DESCRIPTION. The default is True.
+    test_data : Boolean, optional
+        DESCRIPTION. The default is True. Where the loan data is the test
+        data or the evalution data.
+
+    Returns
+    -------
+    df : DataFrame
+        DESCRIPTION. Processed loan data, ready for additional sklearn
+        pre-processing.
+
+    '''
     if test_data:
         df = filter_valid_outcomes(df)
         df = filter_null_columns(df)
@@ -224,12 +339,19 @@ def pre_process_loan_data(df, cat_variables, cont_variables, standardize_cont=Tr
 
 
 def limit_data(df, n=20000):
+    '''
+    Returns a smaller dataframe for faster model training and evaluation.
+    '''
     if n:
         df = df.head(n)
     return df
 
 
 def back_to_df(X):
+    '''
+    Converts sklearn pipeline output array back to pandas DataFrame for use
+    in the models.
+    '''
     try:
         df = pd.DataFrame(X.toarray())
     except:
@@ -238,6 +360,10 @@ def back_to_df(X):
 
 
 def get_x_and_y(df, dep_variable, test_data):
+    '''
+    Splits the data into X and y components and deletes the dependent variable
+    from X.
+    '''
     if test_data:
         y = df[[dep_variable]]
         y = y.values.ravel()
@@ -248,11 +374,39 @@ def get_x_and_y(df, dep_variable, test_data):
 
 
 def get_train_test_data(X, y, features=False, test_size=0.25):
+    '''
+    Splits loan data X and y components into train and test sets.
+
+    Parameters
+    ----------
+    X : DataFrame
+        DESCRIPTION. Loan data independent variables.
+    y : Series
+        DESCRIPTION. Loan data dependent variable.
+    features : array, optional
+        DESCRIPTION. The default is False. An array of feature names from
+        feature selection step. Only features in the list will appear in
+        the train and test data.
+    test_size : TYPE, optional
+        DESCRIPTION. The default is 0.25.
+
+    Returns
+    -------
+    X_train : TYPE
+        DESCRIPTION.
+    X_test : TYPE
+        DESCRIPTION.
+    y_train : TYPE
+        DESCRIPTION.
+    y_test : TYPE
+        DESCRIPTION.
+
+    '''
     if features:
         X = X[features]
 
     if test_size != 0:
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42, stratify=y)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size)
     else:
         X_train = X
         y_train = y
@@ -263,6 +417,10 @@ def get_train_test_data(X, y, features=False, test_size=0.25):
 
 
 def feature_selection(df, y, n=500, num_features="best"):
+    '''
+    Stepwise Feature Selection algorithm chosing the best features. Returns
+    a list of feature names.
+    '''
     df = df.head(n)
     y = y[:n]
     X_train, X_test, y_train, y_test = get_train_test_data(df, y, False, 0)
@@ -280,6 +438,33 @@ def feature_selection(df, y, n=500, num_features="best"):
 
 
 def sklearn_pre_process_loan_data(data, limit=20000, test_data=True):
+    '''
+    Creates an sklearn pipeline for processing categorical and continuous
+    data separately. Categorical data is one hot encoded and continuous
+    data is scaled.
+
+    Parameters
+    ----------
+    data : DataFrame
+        DESCRIPTION. Loan data.
+    limit : integer, optional
+        DESCRIPTION. The default is 20000. Whether to limit the size of
+        the data.
+    test_data : boolean, optional
+        DESCRIPTION. The default is True. Whether the dataset is the test
+        data or the evaluation data.
+
+    Returns
+    -------
+    df : DataFrame
+        DESCRIPTION. Processed loan data ready for train test split and
+        model training.
+    y : Series
+        DESCRIPTION. Loan data dependent variable.
+    preprocessor : Sklearn pipleine
+        DESCRIPTION.
+
+    '''
     data = limit_data(data, limit)
     data, y = get_x_and_y(data, dependent_variable, test_data)
 
@@ -314,16 +499,16 @@ def evaluate_model(results, model, model_name, X_train, X_test, y_train, y_test)
     return results
 
 
-'''
-This function makes sure that the processed input data (state_IL_application.csv)
-and the processed evaluation data (X_test.xlsx) have the same feautures prior
-to model training.
-
-This is important because the evaluation data is smaller, and some categorical
-features may not have a full set of observations. After one hot encoding,
-this could lead to a different number of features between the datasets.
-'''
 def column_standardizer(df_test, df_eval):
+    '''
+    This function makes sure that the processed input data (state_IL_application.csv)
+    and the processed evaluation data (X_test.xlsx) have the same feautures prior
+    to model training.
+
+    This is important because the evaluation data is smaller, and some categorical
+    features may not have a full set of observations. After one hot encoding,
+    this could lead to a different number of features between the datasets.
+    '''
     test_cols = df_test.columns
     eval_cols = df_eval.columns
 
