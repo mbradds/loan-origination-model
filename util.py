@@ -335,6 +335,10 @@ def pre_process_loan_data(df, cat_variables, cont_variables, standardize_cont=Tr
         df = df.dropna()
         check_variables_for_nulls(df)
         find_high_corr(df)
+        before_size = df.shape[0]
+        df = df.drop_duplicates()
+        after_size = df.shape[0]
+        print(before_size - after_size, " duplicate loans removed")
     return df
 
 
