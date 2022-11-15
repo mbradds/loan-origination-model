@@ -6,3 +6,5 @@ __pycache__
 *.xlsx#
 *.pptx#
 .ipynb_checkpoints
+grant_moss_solution
+*.zip
